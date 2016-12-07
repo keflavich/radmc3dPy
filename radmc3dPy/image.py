@@ -1103,7 +1103,7 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
         print ' incl keyword is not set'
         return -1
     if (wav is None):
-        if (lambdarange is None)|(nlam is None):
+        if (lambdarange is None) or (nlam is None):
             print 'ERROR!'
             print ' No wavelength is specified'
             return -1
@@ -1131,6 +1131,9 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
 
     if writepop:
         com = com + " writepop "
+
+    if noscat:
+        com = com + " noscat "
 
     if wavis not None:
         com = com + ' lambda ' + str(wav)
@@ -1180,9 +1183,11 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
         com = com + ' iline '+("%d"%iline)
 
 
-#
-# Now finally run radmc3d and calculate the image
-#
+    #
+    # Now finally run radmc3d and calculate the image
+    #
+
+    print("command is: {0}".format(com))
 
     #dum = sp.Popen([com], stdout=sp.PIPE, shell=True).wait()
     dum = sp.Popen([com], shell=True).wait()
