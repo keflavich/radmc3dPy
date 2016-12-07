@@ -1,6 +1,4 @@
-"""
-PYTHON module for RADMC3D 
-(c) Attila Juhasz, Kees Dullemond 2011,2012,2013,2014
+"""A 2D envelope with density dependence on the theta coordinate in spherical grid
 
 Original IDL model by Kees Dullemond, Python translation by Attila Juhasz
 """
@@ -20,7 +18,7 @@ from radmc3dPy.natconst import *
 # ============================================================================================================================
 def getModelDesc():
     """
-    Function to provide a brief description of the model
+    Provides a brief description of the model
     """
 
     return "Example model: A 2D envelope with density dependence on the theta coordinate in spherical grid"
@@ -31,10 +29,7 @@ def getModelDesc():
 # ============================================================================================================================
 def getDefaultParams():
     """
-    Function to provide default parameter values 
-
-    OUTPUT:
-    -------
+    Provides default parameter values 
 
     Returns a list whose elements are also lists with three elements:
     1) parameter name, 2) parameter value, 3) parameter description
@@ -74,12 +69,19 @@ def getDefaultParams():
 #
 # ============================================================================================================================
 def getDustDensity(grid=None, ppar=None):
-    """
-    Function to create the dust density distribution 
+    """Calculates the dust density distribution 
     
-    OUTPUT:
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
+    
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the volume density in g/cm^3
+    Returns the dust volume density in g/cm^3
     """
 
     xx,yy = np.meshgrid(grid.x, np.pi/2.-grid.y)

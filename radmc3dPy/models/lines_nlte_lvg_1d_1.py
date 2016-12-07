@@ -1,6 +1,4 @@
-"""
-PYTHON module for RADMC3D 
-(c) Attila Juhasz, Kees Dullemond 2011,2012,2013,2014
+"""A 1D simple velocity gradient model to calculate lines with the LVG method
 
 Original IDL model by Kees Dullemond, Python translation by Attila Juhasz
 """
@@ -19,8 +17,7 @@ from radmc3dPy.natconst import *
 #
 # ============================================================================================================================
 def getModelDesc():
-    """
-    Function to provide a brief description of the model
+    """Provides a brief description of the model
     """
 
     return "Example model: A 1D simple velocity gradient model to calculate lines with the LVG method"
@@ -30,11 +27,8 @@ def getModelDesc():
 #
 # ============================================================================================================================
 def getDefaultParams():
-    """
-    Function to provide default parameter values 
+    """Provides default parameter values 
 
-    OUTPUT:
-    -------
 
     Returns a list whose elements are also lists with three elements:
     1) parameter name, 2) parameter value, 3) parameter description
@@ -70,7 +64,7 @@ def getDefaultParams():
     ['gasspec_mol_dbase_type', "['leiden']", ''],
     ['gasspec_colpart_name', "['h2']", ''],
     ['gasspec_colpart_abun', '[1e0]', ''],
-    ['gasspec_vturb', '1e5', ''],
+    ['gasspec_vturb', '1e5', 'Microturbulent linewidth'],
     ['abun_h2', '0.5', ''],
     ['abun_he', '0.1', ''],
     ['nh2', '1e5', ''],
@@ -85,17 +79,19 @@ def getDefaultParams():
 #
 # ============================================================================================================================
 def getGasTemperature(grid=None, ppar=None):
-    """
-    Function to calcualte/set the gas temperature
+    """Calculates the gas temperature
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the gas temperature in K
+    Returns the gas temperature in K
     """
 
 
@@ -105,17 +101,20 @@ def getGasTemperature(grid=None, ppar=None):
 #
 # ============================================================================================================================
 def getDustTemperature(grid=None, ppar=None):
-    """
-    Function to calcualte/set the dust temperature
+    """Calculates/sets the dust temperature
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the dust temperature in K
+    Returns the dust temperature in K
+    
     """
 
 
@@ -125,21 +124,24 @@ def getDustTemperature(grid=None, ppar=None):
 #
 # ============================================================================================================================
 def getGasAbundance(grid=None, ppar=None, ispec=''):
-    """
-    Function to create the conversion factor from volume density to number density of molecule ispec.
+    """Calculates/sets the molecular abundance of species ispec 
     The number density of a molecule is rhogas * abun 
    
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
-        ispec - The name of the gas species whose abundance should be calculated
+    Parameters
+    ----------
+    grid  : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
 
-    OUTPUT:
+    ppar  : dictionary
+            Dictionary containing all parameters of the model 
+
+    ispec : str
+            The name of the gas species whose abundance should be calculated
+
+    Returns
     -------
-        returns the abundance as a Numpy array
+    Returns the abundance as an ndarray
     """
-    
     # Mass of gas per H2-molecule
     #mgas    = mp*(2.0*ppar['abun_h2']+4*ppar['abun_he'])/ppar['abun_h2']
 
@@ -163,17 +165,19 @@ def getGasAbundance(grid=None, ppar=None, ispec=''):
 #
 # ============================================================================================================================
 def getGasDensity(grid=None, ppar=None):
-    """
-    Function to create the total gas density distribution 
+    """Calculates the total gas density distribution 
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the volume density in g/cm^3
+    Returns the gas volume density in g/cm^3
     """
     # Mass of gas per H2-molecule
     mgas    = mp*(2.0*ppar['abun_h2']+4*ppar['abun_he'])/ppar['abun_h2']
@@ -184,19 +188,20 @@ def getGasDensity(grid=None, ppar=None):
 #
 # ============================================================================================================================
 def getDustDensity(grid=None, ppar=None):
-    """
-    Function to create the dust density distribution 
+    """Calculates the dust density distribution 
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the volume density in g/cm^3
+    Returns the dust volume density in g/cm^3
     """
-
     rhogas  = getGasDensity(grid=grid, ppar=ppar)
     rhodust = np.zeros([grid.nx, grid.ny, grid.nz, 1], dtype=np.float64) 
     rhodust[:,:,:,0] = rhogas * ppar['dusttogas']
@@ -206,19 +211,20 @@ def getDustDensity(grid=None, ppar=None):
 #
 # ============================================================================================================================
 def getVTurb(grid=None, ppar=None):
-    """
-    Function to create the turbulent velocity field
+    """Calculates/sets the turbulent velocity field
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the turbulent velocity in cm/s
+    Returns the turbulent velocity in cm/s
     """
-
     vturb = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64) + ppar['gasspec_vturb']
     return vturb
 
@@ -226,19 +232,20 @@ def getVTurb(grid=None, ppar=None):
 #
 # ============================================================================================================================
 def getVelocity(grid=None, ppar=None):
-    """
-    Function to create the turbulent velocity field
+    """Calculates/sets the gas velocity field
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the turbulent velocity in cm/s
+    Returns the turbulent velocity in cm/s
     """
-
     vel = np.zeros([grid.nx, grid.ny, grid.nz, 3], dtype=np.float64)
     for ix in range(grid.nx):
         vel[ix,:,:,0] = ppar['dvdau']*grid.x[ix]/au

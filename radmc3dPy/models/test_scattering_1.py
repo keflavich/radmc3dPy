@@ -1,6 +1,4 @@
-"""
-PYTHON module for RADMC3D 
-(c) Attila Juhasz, Kees Dullemond 2011,2012,2013
+""" A 3D spherical Gaussian blob in a 3D cartesian grid
 
 Original IDL model by Kees Dullemond, Python translation by Attila Juhasz
 """
@@ -20,7 +18,7 @@ from radmc3dPy.natconst import *
 # ============================================================================================================================
 def getModelDesc():
     """
-    Function to provide a brief description of the model
+    Provides a brief description of the model
     """
 
     return "Example model: A 3D spherical Gaussian blob in a 3D cartesian grid"
@@ -31,10 +29,8 @@ def getModelDesc():
 # ============================================================================================================================
 def getDefaultParams():
     """
-    Function to provide default parameter values 
+    Provides default parameter values 
 
-    OUTPUT:
-    -------
 
     Returns a list whose elements are also lists with three elements:
     1) parameter name, 2) parameter value, 3) parameter description
@@ -63,10 +59,10 @@ def getDefaultParams():
     ['wbound', '[0.1, 7., 25., 1e4]', 'Boundaries for the wavelength grid'],
     ['dustkappa_ext', "['silicate']", 'Dust opacity file name extension'],  
     ['nphot', '1000000', 'Number of photons in the thermal Monte Carlo simulation'],
-    ['scattering_mode_max', '0', '0 - no scattering, 1 - isotropic scattering, 2 - anizotropic scattering'],
+    ['scattering_mode_max', '1', '0 - no scattering, 1 - isotropic scattering, 2 - anizotropic scattering'],
     ['iranfreqmode', '1', '', 'Code parameters'],
     ['radius', '5.0*au', ''],
-    ['rho0', '1e-16', '']]
+    ['rho0', '1e-18', '']]
 
     return defpar
 
@@ -74,12 +70,19 @@ def getDefaultParams():
 #
 # ============================================================================================================================
 def getDustDensity(grid=None, ppar=None):
-    """
-    Function to create the dust density distribution 
+    """Calculates the dust density distribution 
     
-    OUTPUT:
+    Parameters
+    ----------
+    grid : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
+    
+    ppar : dictionary
+            Dictionary containing all parameters of the model 
+    
+    Returns
     -------
-        returns the volume density in g/cm^3
+    Returns the dust volume density in g/cm^3
     """
 
     xx,yy = np.meshgrid(grid.x, grid.y)

@@ -1,24 +1,30 @@
-"""
-PYTHON module for RADMC3D 
-(c) Attila Juhasz 2011,2012,2013,2014
+"""Generic protoplanetary disk model 
 
-Generic protoplanetary disk model with a simple chemistry
+The density is given by 
 
-    The density is given by 
+    .. math::
+        
+        \\rho = \\frac{\\Sigma(r,\\phi)}{H_p\\sqrt{(2\\pi)}} \\exp{\\left(-\\frac{z^2}{2H_p^2}\\right)}
 
-                Sigma(r,phi)          /   z^2    \
-        rho =  ---------------- * exp| - -------- |
-                Hp * sqrt(2*pi)       \   2*Hp^2 /
 
-        Sigma - surface density
-        Hp    - Pressure scale height
-        Hp/r  = hrdisk * (r/rdisk)^plh
+    * :math:`\Sigma` - surface density
+    * :math:`H_{\\rm p}` - Pressure scale height
 
-    The molecular abundance function takes into account dissociation and freeze-out of the molecules
-    For photodissociation only the continuum (dust) shielding is taken into account in a way that
-    whenever the continuum optical depth radially drops below a threshold value the molecular abundance
-    is dropped to zero. For freeze-out the molecular abundance below a threshold temperature is decreased
-    by a given fractor. 
+There are two options for the functional form of surface density as a function of radius. For a simple
+power-law the surface density is given by
+
+    * :math:`\Sigma(r) = \\Sigma_0\\left(\\frac{r}{r_{\\rm out}}\\right)^p`
+
+alternatively the surface density can also have an exponential outer tapering:
+
+    * :math:`\Sigma(r) = \\Sigma_0\\left(\\frac{r}{r_{\\rm out}}\\right)^p\\exp{\\left\\{-\\left(\\frac{r}{r_{\\rm out}}\\right)^{2+p}\\right\\}}`
+
+
+The molecular abundance function takes into account dissociation and freeze-out of the molecules
+For photodissociation only the continuum (dust) shielding is taken into account in a way that
+whenever the continuum optical depth radially drops below a threshold value the molecular abundance
+is dropped to zero. For freeze-out the molecular abundance below a threshold temperature is decreased
+by a given fractor. 
 
 
 """
@@ -32,7 +38,7 @@ except:
 
 from radmc3dPy.natconst import *
 try:
-    from matplotlib.pylab import *
+    import matplotlib.pylab as plb
 except:
     print ' WARNING'
     print ' matploblib.pylab cannot be imported ' 
@@ -40,8 +46,7 @@ except:
     print ' Without matplotlib you can use the python module to set up a model but you will not be able to plot things or'
     print ' display images'
 
-from radmc3dPy.crd_trans import vrot
-from radmc3dPy.analyze import readData
+import radmc3dPy.analyze as analyze
 import sys
 
 
@@ -49,8 +54,7 @@ import sys
 #
 # ============================================================================================================================
 def getModelDesc():
-    """
-    Function to provide a brief description of the model
+    """Returns the brief description of the model.
     """
 
     return "Generic protoplanetary disk model"
@@ -60,11 +64,7 @@ def getModelDesc():
 #
 # ============================================================================================================================
 def getDefaultParams():
-    """
-    Function to provide default parameter values 
-
-    OUTPUT:
-    -------
+    """Function to provide default parameter values of the model.
 
     Returns a list whose elements are also lists with three elements:
     1) parameter name, 2) parameter value, 3) parameter description
@@ -94,20 +94,24 @@ def getDefaultParams():
     ['gasspec_mol_dissoc_taulim', '[1.0]', 'Continuum optical depth limit below which all molecules dissociate'],
     ['gasspec_mol_freezeout_temp', '[19.0]', 'Freeze-out temperature of the molecules in Kelvin'],
     ['gasspec_mol_freezeout_dfact', '[1e-3]', 'Factor by which the molecular abundance should be decreased in the frezze-out zone'],
+    ['gasspec_vturb', '0.2e5', 'Microturbulent line width'],
     ['rin', '1.0*au', ' Inner radius of the disk'],
-    ['rdisk', '200.0*au', ' Outer radius of the disk'],
+    ['rdisk', '100.0*au', ' Outer radius of the disk'],
     ['hrdisk', '0.1', ' Ratio of the pressure scale height over radius at hrpivot'],
-    ['hrpivot', "200.0*au", ' Reference radius at which Hp/R is taken'],
+    ['hrpivot', "100.0*au", ' Reference radius at which Hp/R is taken'],
     ['plh', '1./7.', ' Flaring index'],
     ['plsig1', '-1.0', ' Power exponent of the surface density distribution as a function of radius'],
     ['sig0', '0.0', ' Surface density at rdisk'],
-    ['mdisk', '1e-4*ms', ' Mass of the disk (either sig0 or mdisk should be set to zero or commented out)'],
+    ['mdisk', '1e-3*ms', ' Mass of the disk (either sig0 or mdisk should be set to zero or commented out)'],
     ['bgdens', '1e-30', ' Background density (g/cm^3)'],
-    ['srim_rout', '2.0', 'Outer boundary of the smoothing in the inner rim in terms of rin'],
-    ['srim_plsig', '2.0', 'Power exponent of the density reduction inside of srim_rout*rin'],
+    ['srim_rout', '0.0', 'Outer boundary of the smoothing in the inner rim in terms of rin'],
+    ['srim_plsig', '0.0', 'Power exponent of the density reduction inside of srim_rout*rin'],
+    ['prim_rout', '0.0', 'Outer boundary of the puffed-up inner rim in terms of rin'],
+    ['hpr_prim_rout', '0.0', 'Pressure scale height at rin'],
     ['gap_rin', '[0e0*au]', ' Inner radius of the gap'],
     ['gap_rout', '[0e0*au]', ' Outer radius of the gap'],
     ['gap_drfact', '[0e0]', ' Density reduction factor in the gap'],
+    ['sigma_type', '0', ' Surface density type (0 - polynomial, 1 - exponential outer edge (viscous self-similar solution)'],
     ['dusttogas', '0.01', ' Dust-to-gas mass ratio']]
 
 
@@ -116,20 +120,26 @@ def getDefaultParams():
 # ============================================================================================================================
 #
 # ============================================================================================================================
-def getDustDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, grid=None, ppar=None):
-    """
-    Function to create the density distribution in a protoplanetary disk
+def getDustDensity(grid=None, ppar=None):
+    """Calculates the dust density distribution in a protoplanetary disk.
+   
+    Parameters
+    ----------
+    grid : radmc3dGrid
+           An instance of the radmc3dGrid class containing the spatial and frequency/wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+           A dictionary containing all parameters of the model
+    
+    Returns
     -------
-        returns the volume density in g/cm^3, whether the density is that of the gas
-        or dust or both depends on what is specified in the surface density/mass
+    Returns the volume density in g/cm^3
     """
 
 # Get the gas density
-    rhogas = getGasDensity(rcyl=rcyl, phi=phi, z=z, z0=z0, hp=hp, sigma=sigma, grid=grid, ppar=ppar)
+    rhogas = getGasDensity(grid=grid, ppar=ppar)
 
-    rho = array(rhogas) * ppar['dusttogas']
+    rho = np.array(rhogas) * ppar['dusttogas']
 
 # Split up the disk density distribution according to the given abundances
 
@@ -145,8 +155,8 @@ def getDustDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, gr
             # TODO: Add the possibility to handle multiple dust species with different bulk densities and 
             # with multiple grain sizes.
             #
-            gdens = zeros(ngs, dtype=float) + 1.0
-            gs = ppar['gsmin'] * (ppar['gsmax']/ppar['gsmin']) ** (arange(ppar['ngs'], dtype=float64) / (float(ppar['ngs'])-1.))
+            gdens = np.zeros(ngs, dtype=float) + 1.0
+            gs = ppar['gsmin'] * (ppar['gsmax']/ppar['gsmin']) ** (np.arange(ppar['ngs'], dtype=np.float64) / (float(ppar['ngs'])-1.))
             gmass = 4./3.*np.pi*gs**3. * gdens
             gsfact = gmass * gs**(ppar['gsdist_powex']+1)
             gsfact = gsfact / gsfact.sum()
@@ -189,7 +199,7 @@ def getDustDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, gr
 
     #if (ngs>1):
        
-    rho_old = array(rho)
+    rho_old = np.array(rho)
     rho = np.zeros([grid.nx, grid.ny, grid.nz, ngs], dtype=np.float64)
     for igs in range(ngs):
         rho[:,:,:,igs] = rho_old[:,:,:] * gsfact[igs]
@@ -200,110 +210,148 @@ def getDustDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, gr
 # ============================================================================================================================
 #
 # ============================================================================================================================
-def getGasDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, grid=None, ppar=None):
-    """
-    Function to create the density distribution in a protoplanetary disk
+def getGasDensity(grid=None, ppar=None):
+    """Calculates the gas density distribution in a protoplanetary disk.
     
-    OUTPUT:
+    Parameters
+    ----------
+    grid : radmc3dGrid
+           An instance of the radmc3dGrid class containing the spatial and frequency/wavelength grid
+    
+    ppar : dictionary
+           A dictionary containing all parameters of the model
+    
+    Returns
     -------
-        returns the volume density in g/cm^3, whether the density is that of the gas
-        or dust or both depends on what is specified in the surface density/mass
+    Returns the volume density in g/cm^3
     """
-    if (grid==None):
-        print ' ***********************************************************'
-        print 'This mode in model_ppdisk is still not yet finished'
-        print 'Stopped'
-        print ' ***********************************************************'
-        sys.exit(0)
+    
+    rr, th = np.meshgrid(grid.x, grid.y)
+    zz   = rr * np.cos(th)
+    rcyl = rr * np.sin(th)
 
-        nr   = rcyl.shape[1]
-        nphi = phi.shape[0]
-        nz   = z.shape[0]
+    # Calculate the pressure scale height as a function of r, phi
+    hp  = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64)
+    dum = ppar['hrdisk'] * (rcyl/ppar['hrpivot'])**ppar['plh'] * rcyl
 
-        # Calculate the pressure scale height as a function of r, phi
-        if (hp==None):
-            hp  = np.zeros([nr,nphi], dtype=np.float64)
-            dum = ppar['hrdisk'] * (rcyl[:,0]/ppar['rdisk'])**ppar['plh'] * rcyl[:,0]
-            for ip in range(nphi):
-                hp[:,ip] = dum
-   
-        # Calculate the surface density if it is not given (e.g from a hydrodynamic simulation)
-        if (sigma==None):
-            sigma  = np.zeros([nr,nphi], dtype=np.float64)
-            dum    = ppar['sig0'] * (rcyl/ppar['rdisk'])**ppar['plsig1']
-            for ip in range(nphi):
-                ii = (rcyl[:,ip]>=ppar['rin']) & (rcyl[:,ip]<=ppar['rdisk'])
-                sigma[ii,ip] = dum[ii,ip]
-            
-    else:
-        rr, th = np.meshgrid(grid.x, grid.y)
-        zz   = rr * np.cos(th)
-        rcyl = rr * np.sin(th)
+    if ppar.has_key('prim_rout'):
+        if ppar['prim_rout']>=1.:
+            dum_hrdisk = ppar['hrdisk'] * (rcyl/ppar['hrpivot'])**ppar['plh'] 
+            hpr0       = ppar['hrdisk'] * (ppar['prim_rout'] * ppar['rin']/ppar['hrpivot'])**ppar['plh']
+            dummy      = np.log10(hpr0 / ppar['hpr_prim_rout']) / np.log10(ppar['prim_rout'])
+            dum_prim   = ppar['hpr_prim_rout'] * (rcyl/ppar['rin'])**dummy
+            dum        = (dum_hrdisk**8. + dum_prim**8.)**(1./8.) * rcyl
 
-        # Calculate the pressure scale height as a function of r, phi
-        if (hp==None):
-            hp = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64)
-            dum = ppar['hrdisk'] * (rcyl/ppar['rdisk'])**ppar['plh'] * rcyl
-            dum = dum.swapaxes(0,1)
-            for iz in range(grid.nz):
-                hp[:,:,iz] = dum
 
-        # Calculate the surface density if it is not given (e.g from a hydrodynamic simulation)
-        if (sigma==None):
-            sigma = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64)
-            # Calculate sigma from sig0, rdisk and plsig1
-            if ppar.has_key('sig0'):
-                if ppar['sig0'] != 0.:
+    dum = dum.swapaxes(0,1)
+    for iz in range(grid.nz):
+        hp[:,:,iz] = dum
+
+    # Calculate the surface density 
+    sigma = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64)
+    # Calculate sigma from sig0, rdisk and plsig1
+    if ppar.has_key('sig0'):
+        if ppar['sig0'] != 0.:
+            if ppar.has_key('sigma_type'):
+                if ppar['sigma_type']==0:
                     dum1 = ppar['sig0'] * (rcyl/ppar['rdisk'])**ppar['plsig1']
+                else:
+                    expterm = np.exp( -(rcyl/ppar['rdisk'])**(2.0 - ppar['plsig1']))
+                    dum1 = ppar['sig0'] * (rcyl/ppar['rdisk'])**(-ppar['plsig1']) * expterm #np.exp(-(rcyl/ppar['rdisk'])**(2.0 - ppar['plsig1']))
 
-                    if (ppar.has_key('srim_rout') & ppar.has_key('srim_plsig')):
+
+                    #plb.loglog(rcyl.flatten(), dum1.flatten())
+                    #dum = raw_input()
+                    #exit()
+
+
+            else:
+                dum1 = ppar['sig0'] * (rcyl/ppar['rdisk'])**ppar['plsig1']
+
+            if (ppar.has_key('srim_rout') & ppar.has_key('srim_plsig')):
+                if (ppar['srim_rout']!=0.):
+                    
+                    if ppar.has_key('sigma_type'):
+                        if ppar['sigma_type']==0:
+                            # Adding the smoothed inner rim
+                            sig_srim = ppar['sig0'] * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
+                            dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
+                        else:
+                            #sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
+                            sig_srim = ppar['sig0'] * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**(-ppar['plsig1']) * np.exp(-(rcyl/ppar['rdisk'])**(2.0 - ppar['plsig1']))
+                            dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
+                    else:
                         # Adding the smoothed inner rim
                         sig_srim = ppar['sig0'] * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
                         dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
 
-                        p    = -5.0
-                        dum  = (dum1**p + dum2**p)**(1./p)
-                    else:
-                        dum = dum1
 
-                    dum = dum.swapaxes(0,1)
-
-                    for iz in range(grid.nz):
-                        sigma[:,:,iz] = dum
+                    p    = -5.0
+                    dum  = (dum1**p + dum2**p)**(1./p)
                 else:
-                    dum1 = 1.0 * (rcyl/ppar['rdisk'])**ppar['plsig1']
-                  
-                    if (ppar.has_key('srim_rout') & ppar.has_key('srim_plsig')):
+                    dum = dum1
+            else:
+                dum = dum1
+
+            dum = dum.swapaxes(0,1)
+
+            for iz in range(grid.nz):
+                sigma[:,:,iz] = dum
+        else:
+            #dum1 = 1.0 * (rcyl/ppar['rdisk'])**ppar['plsig1']
+            if ppar.has_key('sigma_type'):
+                if ppar['sigma_type']==0:
+                    dum1 =1.0 * (rcyl/ppar['rdisk'])**ppar['plsig1']
+                else:
+                    dum1 = 1.0 * (rcyl/ppar['rdisk'])**(-ppar['plsig1']) * np.exp(-(rcyl/ppar['rdisk'])**(2.0 - ppar['plsig1']))
+            else:
+                dum1 =1.0 * (rcyl/ppar['rdisk'])**ppar['plsig1']
+
+            if (ppar.has_key('srim_rout') & ppar.has_key('srim_plsig')):
+                if (ppar['srim_rout']!=0.):
+
+                    if ppar.has_key('sigma_type'):
+                        if ppar['sigma_type']==0:
+                            # Adding the smoothed inner rim
+                            sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
+                            dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
+                        else:
+                            #sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
+                            sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**(-ppar['plsig1']) * np.exp(-(rcyl/ppar['rdisk'])**(2.0 - ppar['plsig1']))
+                            dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
+                    else:
                         # Adding the smoothed inner rim
                         sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
                         dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
 
-                        p    = -5.0
-                        dum  = (dum1**p + dum2**p)**(1./p)
-                    else:
-                        dum = dum1
+                    # Adding the smoothed inner rim
+                    sig_srim = 1.0 * (ppar['srim_rout']*ppar['rin'] / ppar['rdisk'])**ppar['plsig1']
+                    dum2     = sig_srim * (rcyl / (ppar['srim_rout']*ppar['rin']))**ppar['srim_plsig']
 
-                    dum = dum.swapaxes(0,1)
+                    p    = -5.0
+                    dum  = (dum1**p + dum2**p)**(1./p)
+                else:
+                    dum = dum1
+            else:
+                dum = dum1
 
-                    for iz in range(grid.nz):
-                        sigma[:,:,iz] = dum
+            dum = dum.swapaxes(0,1)
 
+            for iz in range(grid.nz):
+                sigma[:,:,iz] = dum
+
+       
+        if ppar.has_key('sigma_type'):
+            if ppar['sigma_type']==0:
                 for iy in range(grid.ny):
                     ii = (rcyl[iy,:]<ppar['rin'])|(rcyl[iy,:]>ppar['rdisk'])
                     sigma[ii,iy,:] = 0.0
+        else:
+            for iy in range(grid.ny):
+                ii = (rcyl[iy,:]<ppar['rin'])|(rcyl[iy,:]>ppar['rdisk'])
+                sigma[ii,iy,:] = 0.0
 
-    if (z0==None):
-        z0 = np.zeros([grid.nx, grid.nz, grid.ny], dtype=np.float64)
-
-
-    if ppar.has_key('do_incl_innerdisk'):
-        if ppar['do_incl_innerdisk']:
-            for ix in range(grid.nx):                
-                if (grid.x[ix]<ppar['innerdisk_rout']):
-                    for iy in range(grid.ny):
-                        z0[ix,:,iy] = grid.x[ix] * np.sin(ppar['innerdisk_incl']) * np.cos(grid.z)
-
-
+    z0 = np.zeros([grid.nx, grid.nz, grid.ny], dtype=np.float64)
     rho = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64)
     for iz in range(grid.nz):
         for iy in range(grid.ny):
@@ -319,7 +367,7 @@ def getGasDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, gri
             mass = (rho*vol).sum(0).sum(0).sum(0)
             rho  = rho * (ppar['mdisk']/mass)
 
-            if abs(ppar['ybound'][-1]-(pi/2.))<1e-8:
+            if abs(ppar['ybound'][-1]-(np.pi/2.))<1e-8:
                 rho = rho*0.5
     if (ppar['gap_rout']>ppar['rin']):
         for igap in range(len(ppar['gap_rout'])):
@@ -331,27 +379,32 @@ def getGasDensity(rcyl=None, phi=None, z=None, z0=None, hp=None, sigma=None, gri
 #
 # ============================================================================================================================
 def getGasAbundance(grid=None, ppar=None, ispec=''):
-    """
-    Function to create the conversion factor from volume density to number density of molecule ispec.
+    """Calculates the molecular abundance. 
+    
     The number density of a molecule is rhogas * abun 
    
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
-        ispec - The name of the gas species whose abundance should be calculated
+    Parameters
+    ----------
+    grid  : radmc3dGrid
+            An instance of the radmc3dGrid class containing the spatial and wavelength grid
+    
+    ppar  : dictionary
+            Dictionary containing all parameters of the model 
+    
+    ispec : str
+            The name of the gas species whose abundance should be calculated
 
-    OUTPUT:
+    Returns
     -------
-        returns the abundance as a Numpy array
+    Returns an ndarray containing the molecular abundance at each grid point
     """
 
     # Read the dust density and temperature
     try: 
-        data = readData(ddens=True, dtemp=True, binary=True)
+        data = analyze.readData(ddens=True, dtemp=True, binary=True)
     except:
         try: 
-            data = readData(ddens=True, dtemp=True, binary=False)
+            data = analyze.readData(ddens=True, dtemp=True, binary=False)
         except:
             print 'WARNING!!'
             print 'No data could be read in binary or in formatted ascii format'
@@ -405,17 +458,19 @@ def getGasAbundance(grid=None, ppar=None, ispec=''):
 #
 # ============================================================================================================================
 def getVTurb(grid=None, ppar=None):
-    """
-    Function to create the turbulent velocity field
+    """Calculates the turbulent velocity field
     
-    INPUT:
-    ------
-        grid - An instance of the radmc3dGrid class containing the spatial and wavelength grid
-        ppar - Dictionary containing all parameters of the model 
+    Parameters
+    ----------
+    grid : radmc3dGrid
+           An instance of the radmc3dGrid class containing the spatial and frequency/wavelength grid
     
-    OUTPUT:
+    ppar : dictionary
+           A dictionary containing all parameters of the model
+    
+    Returns
     -------
-        returns the turbulent velocity in cm/s
+    Returns an ndarray with the turbulent velocity in cm/s
     """
 
     vturb = np.zeros([grid.nx, grid.ny, grid.nz], dtype=np.float64) + ppar['gasspec_vturb']
@@ -423,48 +478,36 @@ def getVTurb(grid=None, ppar=None):
 # ============================================================================================================================
 #
 # ============================================================================================================================
-def getVelocity(rcyl=None, phi=None, z=None, z0=None, grid=None, ppar=None):
-    """
-    Function to create the velocity field in a protoplanetary disk
+def getVelocity(grid=None, ppar=None):
+    """Calculates the velocity field in a protoplanetary disk.
+    
+    Parameters
+    ----------
+    grid : radmc3dGrid
+           An instance of the radmc3dGrid class containing the spatial and frequency/wavelength grid
+    
+    ppar : dictionary
+           A dictionary containing all parameters of the model
+    
+    Returns
+    -------
+    Returns the gas velocity in cm/s
     """
 
    
-    if (grid==None):
-        nr   = rcyl.shape[1]
-        nphi = phi.shpae[0]
-        nz   = z.shape[0]
+    nr   = grid.nx
+    nphi = grid.nz
+    nz   = grid.ny
+    rcyl = grid.x
 
-        vel = np.zeros([nr,nz,nphi, 3], dtype=np.float64)
-        if (z0==None):
-            vkep = np.sqrt(gg*ppar['mstar'][0]/rcyl)
-            for iz in range(nz):
-                for ip in range(nz):
-                    vel[:,iz,ip, 2] = vkep
-        else:
-            rcyl_rot     = np.arange(nr, dtype=np.float64)
-            for ir in range(nr):
-                dum       = np.array(z0[ir,:])
-                z0_max    = dum.max()
-                rcyl_rot[ir]  = np.sqrt(rcyl[ir]**2. + z0_max**2.)
-            
-            vkep = np.sqrt(gg*ppar['mstar'][0]/rcyl_rot)
-            for iz in range(nz):
-                for ip in range(nz):
-                    vel[:,iz,ip, 2] = vkep
-    else:
-        nr   = grid.nx
-        nphi = grid.nz
-        nz   = grid.ny
-        rcyl = grid.x
-
-        rr, th = np.meshgrid(grid.x, grid.y)
-        rcyl_rot = rr * np.sin(th)
-        
-        vel = np.zeros([nr,nz,nphi,3], dtype=np.float64)
-        vkep = np.sqrt(gg*ppar['mstar'][0]/rcyl)
-        for iz in range(nz):
-            for ip in range(nphi):
-                vel[:,iz,ip,2] = vkep
+    rr, th = np.meshgrid(grid.x, grid.y)
+    rcyl_rot = rr * np.sin(th)
+    
+    vel = np.zeros([nr,nz,nphi,3], dtype=np.float64)
+    vkep = np.sqrt(gg*ppar['mstar'][0]/rcyl)
+    for iz in range(nz):
+        for ip in range(nphi):
+            vel[:,iz,ip,2] = vkep
 
 
     return vel
