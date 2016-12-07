@@ -4,7 +4,7 @@ from distutils.core import setup
 import os, sys
 from subprocess import Popen, PIPE
 
-def find_data_files(src_dir, *wildcards):
+def findFiles(src_dir, *wildcards):
 
     src_dir = src_dir.strip()
     while src_dir[-1]=='/':
@@ -14,7 +14,8 @@ def find_data_files(src_dir, *wildcards):
     # Find all directory names
     dirList = Popen(['find '+src_dir+' -name "*"'], shell=True, \
             stdout=PIPE).communicate()[0].split()
-    
+   
+
     foundList = []
     for i in range(len(dirList)):
         #if (os.path.isdir(dirList[i])&(dirList[i].strip()!=src_dir)):
@@ -32,25 +33,40 @@ def find_data_files(src_dir, *wildcards):
 
             if len(fileList)>0:
                 foundList.append((dirList[i], fileList))
-                
+
     return foundList    
    
-files = find_data_files('./', '*.*')
+fileList = findFiles('./radmc3dPy', '*.py')
 
-python_files = find_data_files('./radmc3dPy', '*.py')[0][1]
+python_files = []
+for i in range(len(fileList)):
+    for j in range(len(fileList[i][1])):
+        python_files.append(fileList[i][1][j])
+
 moduleNames = []
+packageNames = []
 for i in range(len(python_files)):
 
     ind1 = python_files[i].strip()[::-1].find('/')
     dum  = python_files[i].strip()[-ind1:-3]
+
     if dum.strip()!='__init__':
         moduleNames.append('radmc3dPy.'+dum)
-    
+    else:
+        sdum = python_files[i].split('/')[1:-1]
+
+        txt = sdum[0]
+        if len(sdum)>1:
+            for imod in range(1,len(sdum)):
+                txt += '.'+sdum[imod]
+
+        packageNames.append(txt)
+
 
 setup(name='radmc3dPy',
-      version='0.25',
+        version='0.28.2',
       description='Python module for RADMC3D',
       author='Attila Juhasz',
-      author_email='juhasz@strw.leidenuniv.nl',
-      py_modules=moduleNames)
+      author_email='juhasz@ast.cam.ac.uk',
+      packages=packageNames)
 
