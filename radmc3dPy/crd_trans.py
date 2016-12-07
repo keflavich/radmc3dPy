@@ -1,8 +1,5 @@
 """
-PYTHON module for RADMC3D 
-(c) Attila Juhasz 2011,2012,2013
-
-This sub-module contains functions for coordinate transformations (e.g. rotation)
+This module contains functions for coordinate transformations (e.g. rotation).
 """
 try:
     import numpy as np
@@ -14,23 +11,23 @@ except:
 
 #import scipy.linalg as la
 
-def ctrans_sph2cyl(crd=None, theta=None, reverse=False):
-    """
-    Function to transform coordinates between spherical to cylindrical systems
+def ctrans_sph2cyl(crd=None, reverse=False):
+    """Transform coordinates between spherical to cylindrical systems
 
-    INPUT : 
-    -------
-            r,phi,theta : numpy arrays containing the spherical coordinates
-
-    OPTIONS : 
+    Parameters
     ----------
-            reverse=False : Calculates the inverse trasnformation
-                       (cartesian -> spherical). In this case crd should be [r,phi,theta]
+    crd      : ndarray
+               Three element array containing the input coordinates
+               [r,phi,theta] or [r, phi, z] if reverse is True
 
-    OUTPUT : 
+    reverse  : bool
+               If True it calculates the inverse trasnformation
+               (cylindrical -> spherical). In this case crd should be [r,phi,z]
+
+    Returns
     --------
-            result   : a numpy array of [Nr,Nphi,Ntheta,3] dimensions containing the cylindrical 
-                       coordinates [rcyl, z, phi]
+    Returns a numpy array of [Nr,Nphi,Ntheta,3] dimensions containing the cylindrical 
+       coordinates [rcyl, z, phi]
     """
     
     nr     = r.shape[0]
@@ -44,28 +41,27 @@ def ctrans_sph2cyl(crd=None, theta=None, reverse=False):
 
 
 def ctrans_sph2cart(crd=[0,0,0], reverse=False):
-    """
-    Function to transform coordinates between spherical to cartesian systems
+    """Transform coordinates between spherical to cartesian systems
 
-    INPUT : 
+    Parameters
+    ----------
+    crd      : ndarray
+               Three element array containing the input
+               coordinates [x,y,z] or [r,theta,phi] by default
+               the coordinates assumed to be in the cartesian system
+    
+    reverse  : bool
+               If True calculates the inverse trasnformation
+               (cartesian -> spherical). In this case crd should be [r,theta,phi]
+
+    Returns
     -------
-            crd      : Three element array containing the input
-                       coordinates [x,y,z] or [r,phi,theta] by default
-                       the coordinates assumed to be in the cartesian system
-    OPTIONS :
-    ---------
-            reverse=False : Calculates the inverse trasnformation
-                       (cartesian -> spherical). In this case crd should be [r,phi,theta]
-
-    OUTPUT : 
-    --------
-            result   : A three element array containg the output
-                       coordinates [r,phi,theta] or [x,y,z]
+    Returns a three element array containg the output coordinates [r,theta,phi] or [x,y,z]
     """
     if (reverse==False):
         r     = crd[0]
-        phi   = crd[1]
-        theta = crd[2] + 1e-50
+        theta = crd[1] + 1e-50
+        phi   = crd[2]
 
         x = np.sin(theta) * np.cos(phi) * r
         y = np.sin(theta) * np.sin(phi) * r
@@ -85,47 +81,49 @@ def ctrans_sph2cart(crd=[0,0,0], reverse=False):
 
         if (y<0.): phi = 2.0 * np.pi - phi
         
-        crdout = [r, phi, theta]
+        crdout = [r, theta, phi]
         
 
     return crdout
 
 def vtrans_sph2cart(crd=[0,0,0], v=[0,0,0], reverse=False):
-    """
-    Function to transform velocities between spherical to cartesian systems
+    """Transform velocities between spherical to cartesian systems
 
-    INPUT : 
+    Parameters
+    ----------
+    crd     : ndarray
+              Three element array containing the input
+              coordinates [x,y,z] or [r,theta,phi] by default
+              the coordinates assumed to be in the cartesian system
+
+    v       : ndarray
+              Three element array containing the input
+              velocities in the same coordinate system as crd
+
+
+    reverse : bool
+              If True it calculates the inverse trasnformation (cartesian -> spherical)
+
+    Returns
     -------
-            crd      : Three element array containing the input
-                       coordinates [x,y,z] or [r,phi,theta] by default
-                       the coordinates assumed to be in the cartesian system
 
-            v        : Three element array containing the input
-                       velocities in the same coordinate system as crd
+    Returns a three element array containg the output velocities [vr,vphi,vtheta] or [vx,vy,vz]
 
 
-    OPTIONS :
-    ---------
-            reverse=False : Calculates the inverse trasnformation (cartesian -> spherical)
-
-    OUTPUT : 
-    --------
-            result   : A three element array containg the output
-                       velocities [vr,vphi,vtheta] or [vx,vy,vz]
-
-
-    NOTE!!!!! The velocities in the spherical system are not angular velocities!!!!
-    v[1] = dphi/dt * r
-    v[2] = dtheta/dt * r
     """
+    
+    #NOTE!!!!! The velocities in the spherical system are not angular velocities!!!!
+    #v[1] = dphi/dt * r
+    #v[2] = dtheta/dt * r
+
     if (reverse==False):
         r      = crd[0]
-        phi    = crd[1]
-        theta  = crd[2]
+        theta  = crd[1]
+        phi    = crd[2]
         
         vr     = v[0]
-        vphi   = v[1]
-        vtheta = v[2]
+        vtheta = v[1]
+        vphi   = v[2]
         
         vx     = vr*np.sin(theta)*np.cos(phi) - vphi*np.sin(phi) + vtheta*np.cos(theta)*np.cos(phi)
         vy     = vr*np.sin(theta)*np.sin(phi) + vphi*np.cos(phi) + vtheta*np.cos(theta)*np.sin(phi)
@@ -135,60 +133,104 @@ def vtrans_sph2cart(crd=[0,0,0], v=[0,0,0], reverse=False):
 
     else:
         
-        crd_sph = ctrans_sph2cart(crd, reverse=True)
-        r       = crd_sph[0]
-        phi     = crd_sph[1]
-        theta   = crd_sph[2]
+       # crd_sph = ctrans_sph2cart(crd, reverse=True)
+        #r       = crd_sph[0]
+        #theta   = crd_sph[1]
+        #phi     = crd_sph[2]
         
-        a       = [[np.sin(theta)*np.cos(phi), -np.sin(phi), np.cos(theta)*np.cos(phi)],\
-                   [np.sin(theta)*np.sin(phi), np.cos(phi), np.cos(theta)*np.sin(phi)],\
-                   [np.cos(theta), 0., -np.sin(theta)]]
+        #a       = [[np.sin(theta)*np.cos(phi), -np.sin(phi), np.cos(theta)*np.cos(phi)],\
+                   #[np.sin(theta)*np.sin(phi), np.cos(phi), np.cos(theta)*np.sin(phi)],\
+                   #[np.cos(theta), 0., -np.sin(theta)]]
+        
+        #a       = [[np.sin(theta)*np.cos(phi), np.cos(theta)*np.cos(phi), -np.sin(phi)],\
+                   #[np.sin(theta)*np.sin(phi), np.cos(theta)*np.sin(phi), np.cos(phi)],\
+                   #[np.cos(theta), -np.sin(theta),0.]]
 
-        a       = np.array(a, dtype=np.float64)
 
-        vout = la.solve(a,v)
+        #a       = np.array(a, dtype=np.float64)
+
+        #vout = np.linalg.solve(a,v)
+
+
+        #
+        # New stuff
+        #
+        vout = np.zeros(3, dtype=float)
+        r    = np.sqrt((crd**2).sum())
+        rc   = np.sqrt(crd[0]**2 + crd[1]**2)
+
+        # Vr
+        vout[0] = (crd * v).sum()/r             
+        # Vtheta
+        vout[1] = (crd[2]*(crd[0]*v[0] + crd[1]*v[1]) - v[2]*rc**2) / (r*rc)
+        # Vphi
+        vout[2] = (crd[0]*v[1] - crd[1]*v[0])/rc
+
 
     return vout
 
 def csrot(crd=None, ang=None, xang=0.0, yang=0.0, zang=0.0, deg=False):
-    """
-    Function to make coordinate system rotation
+    """ Performs coordinate system rotation.
+
+    Parameters
+    ----------
+
+    crd : numpy ndarray
+          three element vector containing the coordinates of a
+          given point in a cartesian system
+
+    ang : list, numpy ndarray
+          three element array, angles of rotation around the x,y,z axes
+
+    deg : float, optional 
+          If True angles should be given in degree instead of radians (as by default)
  
-    INPUT : 
+   
+    Returns
     -------
-           crd  : three element vector containing the coordinates of a
-                  given point in a cartesian system
+    list
+        Returns a three element list with the rotated coordinates
 
-           ang  : three element array, angles of rotation around the x,y,z axes
 
-    OPTIONS : 
-    ---------
-           deg=True : if this keyword is set angles should be given in
-                  angles instead of radians (as by default)
+    Notes
+    -----
+
+    Rotation matrices
+    
+    Around the x-axis:
+    
+    .. math:: 
+         \\left(\\begin{matrix} 
+                 1 & 0 & 0 \\\\
+                 0 & cos(\\alpha) & -sin(\\alpha)\\\\
+                 0 & sin(\\alpha) & cos(\\alpha)
+                 \\end{matrix}\\right)
+
+    Around the y-axis:
+
+    .. math:: 
+         \\left(\\begin{matrix} 
+                 cos(\\beta) & 0 & -sin(\\beta) \\\\
+                 0 & 1 & 0\\\\
+                 sin(\\beta)& 0 & cos(\\beta)
+                 \\end{matrix}\\right)
+
+    Around the z-axis
+
+    .. math:: 
+         \\left(\\begin{matrix} 
+                 cos(\\gamma) & -sin\\gamma) & 0 \\\\
+                 sin(\\gamma) &  cos(\\gamma) & 0 \\\\
+                 0  & 0 & 1
+                 \\end{matrix}\\right)
  
-    Rotation matrices :
-    -------------------
-    X-axis
-
-     |      1               0            0        |
-     |      0          cos(alpha)    -sin(alpha)  | 
-     |      0          sin(alpha)     cos(alpha)  |
-
-    Y-axis
-
-     |   cos(beta)          0         sin(beta)   |
-     |      0               1            0        |
-     |   -sin(beta)         0         cos(beta)   |
-
-    Z-axis
- 
-     |   cos(gamma)     -sin(gamma)       0        |
-     |  sin(gamma)       cos(gamma)       0        |
-     |      0                0            1        |
 
     """
-
     crd_new = np.zeros(len(crd), dtype=np.float64)
+
+    if ang==None:
+        if (xang==0.)&(yang==0.)&(zang==0.):
+            return crd
 
     if (ang!=None):
         xang = ang[0]
@@ -237,23 +279,26 @@ def csrot(crd=None, ang=None, xang=0.0, yang=0.0, zang=0.0, deg=False):
         
         crd_new = [dumx, dumy, dumz]
 
+
+
     return crd_new
 
 def vrot(crd=None, v=None, ang=None):
-    """
-    Function to rotate a vector in spherical coordinate system
+    """Rotates a vector in spherical coordinate system.
+    First transforms the vector to cartesian coordinate system, then does the rotation then 
+    makes the inverse transformation
 
-    First transform the vector to cartesian coordinate system do the rotation then make the
-     inverse transformation
+    Parameters 
+    ----------
+    crd  : ndarray
+           Three element array containing the coordinates of a
+           given point in the cartesian system
 
-    INPUT : 
-    -------
-           crd  : three element vector containing the coordinates of a
-                  given point in a cartesian system
+    v    : ndarray
+           Three element array, angles of rotation around the x,y,z axes
 
-           v    : three element array, angles of rotation around the x,y,z axes
-
-           ang  : angle around the x, y, z, axes with which the vector should be rotated
+    ang  : ndarray 
+           Three element arrray containing the angles to rotate around the x, y, z, axes, respectively
 
     """
 # Convert the position vector to cartesian coordinate system
