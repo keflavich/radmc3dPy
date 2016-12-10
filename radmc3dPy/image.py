@@ -1347,6 +1347,7 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
               posang=None, pointau=None, fluxcons=True, nostar=False,
               noscat=False, widthkms=None, linenlam=None, vkms=None,
               iline=None, lambdarange=None, nlam=None, stokes=False,
+              doppcatch=False,
               binary=False, writepop=False):
     """Calculates a rectangular image with RADMC-3D
 
@@ -1523,6 +1524,9 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
 
     if stokes:
         com = com + ' stokes '
+
+    if doppcatch:
+        com = com + ' doppcatch '
 
     if binary:
         com = com + ' imageunform '
