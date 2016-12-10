@@ -264,8 +264,9 @@ class radmc3dImage(object):
 
         return res
 # --------------------------------------------------------------------------------------------------
-    def writeFits(self, fname='', dpc=1., coord='03h10m05s -10d05m30s', bandwidthmhz=2000.0,
-            casa=False, nu0=0., wav0=0., stokes='I', fitsheadkeys=[]):
+    def writeFits(self, fname='', dpc=1., coord='03h10m05s -10d05m30s',
+                  bandwidthmhz=2000.0, casa=False, nu0=0., wav0=0., stokes='I',
+                  fitsheadkeys=[], overwrite=None):
         """Writes out a RADMC-3D image data in fits format.
 
         Parameters
@@ -485,7 +486,7 @@ class radmc3dImage(object):
                 for ikey in fitsheadkeys.keys():
                     hdulist[0].header.update(ikey, fitsheadkeys[ikey], '')
 
-        if os.path.exists(fname):
+        if os.path.exists(fname) and overwrite is None:
             print fname+' already exists'
             dum = raw_input('Do you want to overwrite it (yes/no)?')
             if (dum.strip()[0]=='y') or (dum.strip()[0]=='Y'):
@@ -494,7 +495,7 @@ class radmc3dImage(object):
             else:
                 print 'No image has been written'
         else:
-            hdu.writeto(fname)
+            hdu.writeto(fname, clobber=overwrite)
 # --------------------------------------------------------------------------------------------------
     def plotMomentMap(self, moment=0, nu0=0, wav0=0, dpc=1., au=False, arcsec=False, cmap=None, vclip=None):
         """Plots moment maps
@@ -1346,7 +1347,7 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
               posang=None, pointau=None, fluxcons=True, nostar=False,
               noscat=False, widthkms=None, linenlam=None, vkms=None,
               iline=None, lambdarange=None, nlam=None, stokes=False,
-              binary=False, writepop=True):
+              binary=False, writepop=False):
     """Calculates a rectangular image with RADMC-3D
 
     Parameters
@@ -1474,11 +1475,17 @@ def makeImage(npix=None, incl=None, wav=None, sizeau=None, phi=None,
     com = com + ' sizeau ' + str(sizeau)
 
     if wav is not None:
+        print("Using wavelength specified by 'wav' parameter")
         com = com + ' lambda ' + str(wav)
     elif (lambdarange is not None) and (nlam is not None):
+        print("Using wavelength range specified by 'lambdarange' parameter")
         com = com + ' lambdarange ' + str(lambdarange[0]) + ' ' + str(lambdarange[1]) + ' nlam ' + str(int(nlam))
     elif (vkms is not None):
+        print("Using velocity specified by 'vkms' parameter")
         com = com + ' vkms ' + str(vkms)
+        if widthkms is not None:
+            print("...width width specified by 'widthkms' parameter")
+            com = com + " widthkms " + str(widthkms)
     elif ((widthkms is not None) and (linenlam is not None)):
         com = com + ' widthkms ' + str(widthkms) + ' linenlam ' + str(linenlam)
 
