@@ -763,16 +763,26 @@ class radmc3dGrid(object):
             if grid_style == 10:
                 # Layer-style AMR grid
                 nrlevels,nrlayers = map(int, rfile.readline.split())
+                if nrlayers > 0:
+                    raise NotImplementedError("AMR grids are not yet supported")
+                else:
+                    # in AMR, all entries are on the same line for the root grid
+                    self.xi = np.array([float(x) for x in rfile.readline().split()],
+                                       dtype=np.float64)
+                    self.yi = np.array([float(x) for x in rfile.readline().split()],
+                                       dtype=np.float64)
+                    self.zi = np.array([float(x) for x in rfile.readline().split()],
+                                       dtype=np.float64)
             else:
                 nrlevels,nrlayers = 0,0
 
-            self.xi           = np.zeros(self.nx+1, dtype=np.float64)
-            self.yi           = np.zeros(self.ny+1, dtype=np.float64)
-            self.zi           = np.zeros(self.nz+1, dtype=np.float64)
-           
-            for i in range(self.nxi): self.xi[i] = float(rfile.readline())
-            for i in range(self.nyi): self.yi[i] = float(rfile.readline())
-            for i in range(self.nzi): self.zi[i] = float(rfile.readline())
+                self.xi = np.zeros(self.nx+1, dtype=np.float64)
+                self.yi = np.zeros(self.ny+1, dtype=np.float64)
+                self.zi = np.zeros(self.nz+1, dtype=np.float64)
+               
+                for i in range(self.nxi): self.xi[i] = float(rfile.readline())
+                for i in range(self.nyi): self.yi[i] = float(rfile.readline())
+                for i in range(self.nzi): self.zi[i] = float(rfile.readline())
 
             if self.crd_sys=='car':
                 self.x = (self.xi[0:self.nx] +  self.xi[1:self.nx+1]) * 0.5
@@ -1202,7 +1212,8 @@ class radmc3dData(object):
                 (e.g. 'x' for the first dimension or 'xyz' for all three dimensions)
         
         kappa : float
-                Mass extinction coefficients of the dust species at the desired wavelength
+                Mass extinction coefficients of the dust species at the desired
+                wavelength
         
         Returns
         -------
