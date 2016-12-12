@@ -25,6 +25,8 @@ from radmc3dPy.natconst import *
 import radmc3dPy.crd_trans  as crd_trans 
 from staratm import StellarAtm
 
+# global constant
+amu = 1.6605389209999996e-24
 
 class radmc3dGrid(object):
     """ Class for spatial and frequency grid used by RADMC-3D.
@@ -762,7 +764,7 @@ class radmc3dGrid(object):
             self.nxi,self.nyi,self.nzi = self.nx+1, self.ny+1, self.nz+1
             if grid_style == 10:
                 # Layer-style AMR grid
-                nrlevels,nrlayers = map(int, rfile.readline.split())
+                nrlevels,nrlayers = map(int, rfile.readline().split())
                 if nrlayers > 0:
                     raise NotImplementedError("AMR grids are not yet supported")
                 else:
@@ -1601,7 +1603,7 @@ class radmc3dData(object):
         self.vturb = self._scalarfieldReader(fname=fname, binary=binary)
        
 # --------------------------------------------------------------------------------------------------
-    def readGasDens(self,ispec='',binary=True):
+    def readGasDens(self, ispec='', binary=True, molmass=1.):
         """Reads the gas density.
 
         Parameters
@@ -1613,6 +1615,10 @@ class radmc3dData(object):
 
         binary : bool 
                 If true the data will be read in binary format, otherwise the file format is ascii
+
+        molmass : float
+            The molecular mass of the specified species.  This is used to
+            compute the mass density.
 
         """
         
@@ -1627,6 +1633,12 @@ class radmc3dData(object):
             
         print 'Reading gas density ('+fname+')'
         self.ndens_mol = self._scalarfieldReader(fname=fname, binary=binary)
+
+        if self.rhogas == -1:
+            self.rhogas = self.ndens_mol[:,:,:,0] * molmass * amu
+        else:
+            print("Adding {0} density to existing gas density".format(ispec))
+            self.rhogas += self.ndens_mol[:,:,:,-1] * molmass * amu
        
 # --------------------------------------------------------------------------------------------------
 
@@ -4899,7 +4911,8 @@ def readOpac(ext=[''], idust=None, scatmat=None, old=False):
 # --------------------------------------------------------------------------------------------------
 # Functions for an easy compatibility with the IDL routines
 # --------------------------------------------------------------------------------------------------
-def readData(ddens=False, dtemp=False, gdens=False, gtemp=False, gvel=False, ispec=None, vturb=False, binary=True, old=False):
+def readData(ddens=False, dtemp=False, gdens=False, gtemp=False, gvel=False,
+             ispec=None, vturb=False, binary=True, old=False, molmass=1.):
     """Reads the physical variables of the model (e.g. density, velocity, temperature).
 
     Parameters
@@ -4922,6 +4935,10 @@ def readData(ddens=False, dtemp=False, gdens=False, gtemp=False, gvel=False, isp
     
     ispec : str
             Name of the molecule in the 'molecule_ispec.inp' filename
+
+    molmass : float
+        The molecular mass of the ispec-specified species.  This is used to
+        compute the mass density.
         
     old   : bool, optional
             If set to True the file format of the previous, 2D version of radmc will be used
@@ -4945,7 +4962,7 @@ def readData(ddens=False, dtemp=False, gdens=False, gtemp=False, gvel=False, isp
             print ' numberdens_gasspecname.inp'
             return 0
         else:
-            res.readGasDens(ispec=ispec,binary=binary)
+            res.readGasDens(ispec=ispec, binary=binary, molmass=molmass)
 
     return res
 
