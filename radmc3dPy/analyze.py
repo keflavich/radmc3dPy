@@ -760,6 +760,11 @@ class radmc3dGrid(object):
             dum         = rfile.readline().split()
             self.nx,self.ny,self.nz    = int(dum[0]), int(dum[1]), int(dum[2])
             self.nxi,self.nyi,self.nzi = self.nx+1, self.ny+1, self.nz+1
+            if grid_style == 10:
+                # Layer-style AMR grid
+                nrlevels,nrlayers = map(int, rfile.readline.split())
+            else:
+                nrlevels,nrlayers = 0,0
 
             self.xi           = np.zeros(self.nx+1, dtype=np.float64)
             self.yi           = np.zeros(self.ny+1, dtype=np.float64)
